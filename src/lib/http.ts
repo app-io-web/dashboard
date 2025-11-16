@@ -101,6 +101,37 @@ for (const c of [api, mailer]) {
   );
 }
 
+
+
+// ----------------------------------------------------
+// AUTH: helper de redirect pra login (HashRouter + GitHub Pages)
+// ----------------------------------------------------
+function redirectToLoginFrom401() {
+  try {
+    const base = import.meta.env.BASE_URL || "/"; // ex: "/" em dev, "/dashboard/" no gh-pages
+
+    // Em HashRouter o path real está no hash:
+    //   http://localhost:5173/#/flows        -> "#/flows"
+    //   https://.../dashboard/#/flows       -> "#/flows"
+    const hash = window.location.hash || "";
+    let fromPath = hash.replace(/^#/, "") || "/";
+
+    // evita loop se já estiver no login
+    if (fromPath.startsWith("/login")) {
+      fromPath = "/";
+    }
+
+    const target = `${base}#/login?from=${encodeURIComponent(fromPath)}`;
+
+    // se já estamos no login, não redireciona de novo
+    if (!window.location.hash.startsWith("#/login")) {
+      window.location.assign(target);
+    }
+  } catch {
+    // deixa quieto se der algum erro bizarro de window/location
+  }
+}
+
 // ----------------------------------------------------
 // AUTH: Authorization + tratamento de 401 (com eject no HMR)
 // ----------------------------------------------------
@@ -120,18 +151,14 @@ export function wireAuth() {
     return cfg;
   });
 
-  // Response: 401 => limpa sessão e manda pro login
+  // Response: 401 => limpa sessão e manda pro login certo
   authEjectors.res = api.interceptors.response.use(
     (r) => r,
     (err) => {
       const status = err?.response?.status;
       if (status === 401) {
         try { clearAuth?.(); } catch {}
-        try {
-          const here = location.pathname + location.search;
-          const to = `/login?from=${encodeURIComponent(here)}`;
-          if (location.pathname !== "/login") location.assign(to);
-        } catch {}
+        redirectToLoginFrom401();
       }
       return Promise.reject(err);
     }
@@ -164,19 +191,18 @@ export function wireMailerAuth() {
     (err) => {
       if (err?.response?.status === 401) {
         try { clearAuth?.(); } catch {}
-        try {
-          const here = location.pathname + location.search;
-          const to = `/login?from=${encodeURIComponent(here)}`;
-          if (location.pathname !== "/login") location.assign(to);
-        } catch {}
+        redirectToLoginFrom401();
       }
       return Promise.reject(err);
     }
   );
 }
 
-// Chame ao carregar o app
-wireMailerAuth();
+
+
+
+
+
 
 // ----------------------------------------------------
 // SHIMS (mantidos para compat)
