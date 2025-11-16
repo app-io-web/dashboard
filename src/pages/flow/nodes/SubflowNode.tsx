@@ -22,37 +22,35 @@ export default function SubflowNode({ data, selected }: NodeProps<Data>) {
   const handleOpenTargetFlow = () => {
   if (!data?.targetFlowId) return;
 
-  // empresaId do fluxo pai
+  // pega empresaId da query atual (do fluxo pai)
   const sp = new URLSearchParams(window.location.search);
   const empresaId = sp.get("empresaId");
 
-  // base configurada no Vite (ex: "/dashboard/")
-  const basePath =
-    (import.meta as any).env?.BASE_URL && (import.meta as any).env.BASE_URL !== "/"
-      ? (import.meta as any).env.BASE_URL
-      : "/";
-
-  const hasHashRouter = !!window.location.hash; // se tem "#/..." na URL
-
-  // monta o caminho do fluxo de destino
-  let path = `flow/${data.targetFlowId}`;
-  if (empresaId) {
-    path += `?empresaId=${empresaId}`;
-  }
+  // parte da URL antes do hash (#)
+  const baseWithoutHash = window.location.href.split("#")[0]; 
+  const hasHashRouter = window.location.hash.startsWith("#/");
 
   let finalUrl: string;
 
   if (hasHashRouter) {
-    // caso GitHub Pages + HashRouter => /dashboard/#/flow/...
-    finalUrl = `${window.location.origin}${basePath}#/${path}`;
+    // GitHub Pages + HashRouter
+    // exemplo: https://app-io-web.github.io/dashboard/#/flow/ID?empresaId=...
+    finalUrl = `${baseWithoutHash}#/flow/${data.targetFlowId}`;
+    if (empresaId) {
+      finalUrl += `?empresaId=${empresaId}`;
+    }
   } else {
-    // caso Netlify/BrowserRouter => /dashboard/flow/... ou /flow/...
-    // basePath já cuida se for / ou /dashboard/
-    finalUrl = `${window.location.origin}${basePath}${path}`;
+    // ambientes com BrowserRouter (ex: Netlify)
+    // usa caminho relativo a partir da raiz
+    finalUrl = `/flow/${data.targetFlowId}`;
+    if (empresaId) {
+      finalUrl += `?empresaId=${empresaId}`;
+    }
   }
 
   window.open(finalUrl, "_blank", "noopener,noreferrer");
-  };
+};
+
 
 
   return (
