@@ -1,8 +1,8 @@
 {
   "name": "AppSytem Dashboard",
   "short_name": "AppSytem",
-  "start_url": "./#/",
-  "scope": "./",
+  "start_url": "/dashboard/#/",   
+  "scope": "/dashboard/",        
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
