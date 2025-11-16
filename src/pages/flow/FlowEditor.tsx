@@ -1,7 +1,12 @@
 // pages/flow/FlowEditor.tsx
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ReactFlowProvider, type Node as RFNode, type Connection, type Edge as RFEdge } from "reactflow";
+import {
+  ReactFlowProvider,
+  type Node as RFNode,
+  type Connection,
+  type Edge as RFEdge,
+} from "reactflow";
 
 import { PanelLeft, PanelRight, Trash2, Link2, Unlink2 } from "lucide-react";
 
@@ -116,11 +121,7 @@ function FlowEditorInner({
 
     if (!updated) return;
 
-    // em mobile, se atualizou/selecionou, garante painel aberto
-    if (isMobile) {
-      setOpenInspector(true);
-    }
-
+    // ❌ não abre mais o inspector automaticamente no mobile
     onNodesChange([
       {
         id: updated.id,
@@ -130,7 +131,7 @@ function FlowEditorInner({
     ]);
   };
 
-  // 🔴 Deletar nó selecionado (usado no mobile)
+  // 🔴 Deletar nó selecionado
   const handleDeleteSelectedNode = () => {
     if (!selectedNode) return;
 
@@ -153,7 +154,7 @@ function FlowEditorInner({
     }
   };
 
-    // 🔌 Desconectar todas as conexões do nó selecionado (mobile)
+  // 🔌 Desconectar todas as conexões do nó selecionado (mobile)
   const handleDisconnectSelectedNode = () => {
     if (!selectedNode) return;
 
@@ -185,64 +186,7 @@ function FlowEditorInner({
       (e) => e.source === selectedNode.id || e.target === selectedNode.id
     );
 
-
-  // 🔗 Lógica de clique em nó no MOBILE (tap-to-connect)
-  const handleMobileNodeClick = (node: RFNode) => {
-    // Se estiver em modo conectar, usamos toques pra criar aresta
-    if (connectMode) {
-      // 1º toque: escolhe a origem
-      if (!connectSourceId) {
-        setConnectSourceId(node.id);
-        setSelectedNode(node);
-        return;
-      }
-
-      // 2º toque: escolhe o destino
-      if (connectSourceId && connectSourceId !== node.id) {
-        const connection: Connection = {
-          source: connectSourceId,
-          target: node.id,
-        };
-
-        // 🧠 usa o conector inteligente
-        handleSmartConnect(connection);
-      }
-
-
-      // Reseta estado depois da tentativa
-      setConnectSourceId(null);
-      setConnectMode(false);
-      return;
-    }
-
-    // Comportamento normal: selecionar e abrir inspector
-    setSelectedNode(node);
-    setOpenInspector(true);
-  };
-
-  // Quando clica no "vazio" do canvas em mobile
-  const handleMobilePaneClick = () => {
-    setSelectedNode(null);
-    setOpenInspector(false);
-
-    // Sai do modo conectar e limpa origem
-    setConnectMode(false);
-    setConnectSourceId(null);
-  };
-
-  // Quando alterna o modo conectar
-  const toggleConnectMode = () => {
-    // se desativar, limpa origem
-    setConnectMode((prev) => {
-      const next = !prev;
-      if (!next) {
-        setConnectSourceId(null);
-      }
-      return next;
-    });
-  };
-
-    // 🔍 Helper: achar nó pelo id
+  // 🔍 Helper: achar nó pelo id
   const findNodeById = (id: string | null | undefined): RFNode | undefined => {
     if (!id) return undefined;
     return nodes.find((n) => n.id === id);
@@ -298,7 +242,9 @@ function FlowEditorInner({
     if (allowsMultipleInputs) return true;
 
     const incomingData = edgesList.filter(
-      (e) => e.target === target.id && (((e.data as any)?.kind as EdgeKind | undefined) ?? "data") === "data"
+      (e) =>
+        e.target === target.id &&
+        (((e.data as any)?.kind as EdgeKind | undefined) ?? "data") === "data"
     );
 
     // Se já tem uma entrada de dado, bloqueia novas
@@ -320,7 +266,6 @@ function FlowEditorInner({
 
     // Se for conexão de dado e o target já tem uma entrada, bloqueia
     if (kind === "data" && !canConnectDataToTarget(targetNode, edges as RFEdge[])) {
-      // aqui daria pra disparar toast depois, se quiser
       console.warn("[Flow] Ignorando conexão: alvo já tem entrada de dados.");
       return;
     }
@@ -342,13 +287,65 @@ function FlowEditorInner({
         kind,
       },
       label,
-      // Conexão de dados pode ser animada, decisão fica reta
       animated: kind === "data" ? true : (connection as any).animated,
     };
 
     onConnect(enhanced);
   };
 
+  // 🔗 Lógica de clique em nó no MOBILE (tap-to-connect)
+  const handleMobileNodeClick = (node: RFNode) => {
+    // Se estiver em modo conectar, usamos toques pra criar aresta
+    if (connectMode) {
+      // 1º toque: escolhe a origem
+      if (!connectSourceId) {
+        setConnectSourceId(node.id);
+        setSelectedNode(node);
+        return;
+      }
+
+      // 2º toque: escolhe o destino
+      if (connectSourceId && connectSourceId !== node.id) {
+        const connection: Connection = {
+          source: connectSourceId,
+          target: node.id,
+        };
+
+        // 🧠 usa o conector inteligente
+        handleSmartConnect(connection);
+      }
+
+      // Reseta estado depois da tentativa
+      setConnectSourceId(null);
+      setConnectMode(false);
+      return;
+    }
+
+    // Comportamento normal: **apenas selecionar** o nó
+    // o drawer só abre ao clicar no botão "Editar nó"
+    setSelectedNode(node);
+  };
+
+  // Quando clica no "vazio" do canvas em mobile
+  const handleMobilePaneClick = () => {
+    setSelectedNode(null);
+    setOpenInspector(false);
+
+    // Sai do modo conectar e limpa origem
+    setConnectMode(false);
+    setConnectSourceId(null);
+  };
+
+  // Quando alterna o modo conectar
+  const toggleConnectMode = () => {
+    setConnectMode((prev) => {
+      const next = !prev;
+      if (!next) {
+        setConnectSourceId(null);
+      }
+      return next;
+    });
+  };
 
   return (
     <>
@@ -367,20 +364,19 @@ function FlowEditorInner({
         <div className="flex flex-1 overflow-hidden">
           <Sidebar onAddNode={addNode} />
 
-            <div className="flex-1 relative">
+          <div className="flex-1 relative">
             <FlowCanvas
               nodes={nodes}
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
-              onConnect={handleSmartConnect} // 🧠 CONECTAR INTELIGENTE
+              onConnect={handleSmartConnect}
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}
               onDrop={onDrop}
               onDragOver={onDragOver}
             />
           </div>
-
 
           <NodePanel
             node={selectedNode}
@@ -393,19 +389,17 @@ function FlowEditorInner({
       {/* MOBILE / TABLET EM PÉ – canvas full + drawers */}
       {isMobile && (
         <div className="relative flex-1 overflow-hidden">
-            <FlowCanvas
+          <FlowCanvas
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            onConnect={handleSmartConnect} // 🧠 aqui também
+            onConnect={handleSmartConnect}
             onNodeClick={(_, node) => handleMobileNodeClick(node)}
             onPaneClick={handleMobilePaneClick}
             onDrop={onDrop}
             onDragOver={onDragOver}
           />
-
-
 
           {/* botões flutuantes topo-esquerda */}
           <div className="absolute top-3 left-3 z-20 flex gap-2 flex-wrap">
@@ -460,21 +454,22 @@ function FlowEditorInner({
               <Unlink2 className="w-4 h-4" />
               Desconectar nó
             </button>
-          </div>
 
-          {/* 🔴 Botão flutuante de deletar nó (mobile) */}
-          {selectedNode && (
-            <div className="absolute bottom-4 right-4 z-20">
-              <button
-                type="button"
-                onClick={handleDeleteSelectedNode}
-                className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-lg active:scale-95 transition"
-              >
-                <Trash2 className="w-4 h-4" />
-                Excluir nó
-              </button>
-            </div>
-          )}
+            {/* 🧨 Botão de excluir nó ao lado dos outros */}
+            <button
+              type="button"
+              disabled={!selectedNode}
+              onClick={handleDeleteSelectedNode}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium shadow-md border ${
+                selectedNode
+                  ? "bg-red-50 border-red-200 text-red-700"
+                  : "bg-gray-100 border-gray-200 text-gray-400"
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+              Excluir nó
+            </button>
+          </div>
 
           {/* Dica visual quando estiver em modo conectar com origem escolhida */}
           {connectMode && connectSourceId && (
