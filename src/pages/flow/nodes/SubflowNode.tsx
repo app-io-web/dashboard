@@ -12,6 +12,21 @@ type Data = {
   color?: string | null;
 };
 
+function getEmpresaIdFromLocation() {
+  // HashRouter (GitHub Pages): #/flow/ID?empresaId=...
+  if (window.location.hash.startsWith("#/")) {
+    const [, queryString] = window.location.hash.split("?");
+    if (!queryString) return null;
+
+    const sp = new URLSearchParams(queryString);
+    return sp.get("empresaId");
+  }
+
+  // BrowserRouter (Netlify, etc): /flow/ID?empresaId=...
+  const sp = new URLSearchParams(window.location.search);
+  return sp.get("empresaId");
+}
+
 export default function SubflowNode({ data, selected }: NodeProps<Data>) {
   const fallbackColor = "#2563eb";
   const color = data?.color || fallbackColor;
@@ -20,38 +35,33 @@ export default function SubflowNode({ data, selected }: NodeProps<Data>) {
     (data?.icon && icons[data.icon as keyof typeof icons]) || Share2;
 
   const handleOpenTargetFlow = () => {
-  if (!data?.targetFlowId) return;
+    if (!data?.targetFlowId) return;
 
-  // pega empresaId da query atual (do fluxo pai)
-  const sp = new URLSearchParams(window.location.search);
-  const empresaId = sp.get("empresaId");
+    const empresaId = getEmpresaIdFromLocation();
 
-  // parte da URL antes do hash (#)
-  const baseWithoutHash = window.location.href.split("#")[0]; 
-  const hasHashRouter = window.location.hash.startsWith("#/");
+    // parte da URL antes do hash (#)
+    const baseWithoutHash = window.location.href.split("#")[0];
+    const hasHashRouter = window.location.hash.startsWith("#/");
 
-  let finalUrl: string;
+    let finalUrl: string;
 
-  if (hasHashRouter) {
-    // GitHub Pages + HashRouter
-    // exemplo: https://app-io-web.github.io/dashboard/#/flow/ID?empresaId=...
-    finalUrl = `${baseWithoutHash}#/flow/${data.targetFlowId}`;
-    if (empresaId) {
-      finalUrl += `?empresaId=${empresaId}`;
+    if (hasHashRouter) {
+      // GitHub Pages + HashRouter
+      // https://app-io-web.github.io/dashboard/#/flow/ID?empresaId=...
+      finalUrl = `${baseWithoutHash}#/flow/${data.targetFlowId}`;
+      if (empresaId) {
+        finalUrl += `?empresaId=${encodeURIComponent(empresaId)}`;
+      }
+    } else {
+      // BrowserRouter
+      finalUrl = `/flow/${data.targetFlowId}`;
+      if (empresaId) {
+        finalUrl += `?empresaId=${encodeURIComponent(empresaId)}`;
+      }
     }
-  } else {
-    // ambientes com BrowserRouter (ex: Netlify)
-    // usa caminho relativo a partir da raiz
-    finalUrl = `/flow/${data.targetFlowId}`;
-    if (empresaId) {
-      finalUrl += `?empresaId=${empresaId}`;
-    }
-  }
 
-  window.open(finalUrl, "_blank", "noopener,noreferrer");
-};
-
-
+    window.open(finalUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div
@@ -75,10 +85,7 @@ export default function SubflowNode({ data, selected }: NodeProps<Data>) {
           <IconComponent className="w-4 h-4" />
         </div>
 
-        <div
-          className="text-sm font-semibold"
-          style={{ color }}
-        >
+        <div className="text-sm font-semibold" style={{ color }}>
           {data?.label ?? "Chamar Fluxo"}
         </div>
       </div>
