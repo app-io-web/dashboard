@@ -1,0 +1,1 @@
+git add . && git commit -m "deploy: ajustes finais PWA + OG cards" && git push && pnpm run build && pnpm run deploy
