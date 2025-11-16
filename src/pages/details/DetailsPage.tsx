@@ -257,8 +257,57 @@ export default function DetailsPage() {
             onSaveAll={async ({ urls, cred, images }) => {
               const appKey = app.ref ?? app.id;
               if (!appKey) throw new Error("app key ausente (ref/id)");
-              // ... resto do código que você já tinha
+
+              // ----------- 1) sobe imagens se tiver arquivo novo ----------
+              const finalImages: any = {};
+
+              if (images?.square?.file) {
+                const f = images.square.file;
+                const fd = new FormData();
+                fd.append("file", f);
+                fd.append("kind", "square");
+
+                const up = await api.post(
+                  `/apps/${encodeURIComponent(String(appKey))}/upload-image`,
+                  fd,
+                  { headers: { "Content-Type": "multipart/form-data" } }
+                );
+
+                finalImages.imageSquareUrl = up.data?.url ?? null;
+              } else if (images?.square?.url) {
+                finalImages.imageSquareUrl = images.square.url;
+              }
+
+              if (images?.wide?.file) {
+                const f = images.wide.file;
+                const fd = new FormData();
+                fd.append("file", f);
+                fd.append("kind", "wide");
+
+                const up = await api.post(
+                  `/apps/${encodeURIComponent(String(appKey))}/upload-image`,
+                  fd,
+                  { headers: { "Content-Type": "multipart/form-data" } }
+                );
+
+                finalImages.imageWideUrl = up.data?.url ?? null;
+              } else if (images?.wide?.url) {
+                finalImages.imageWideUrl = images.wide.url;
+              }
+
+              // ----------- 2) envia URLs + credencial + imagens ----------
+              await api.patch(`/apps/${encodeURIComponent(String(appKey))}`, {
+                importantUrls: urls,
+                adminCredential: cred,
+                ...finalImages,
+              });
+
+              // ----------- 3) dispara revalidação SWR -----------
+              if (typeof mutate === "function") {
+                await (mutate as any)(undefined, { revalidate: true });
+              }
             }}
+
             onAfterSave={async () => {
               if (typeof mutate === "function") {
                 await (mutate as any)(undefined, { revalidate: true });

@@ -95,9 +95,9 @@ export default function AppActionsDrawer({
     initialCred?.kind === "tempPassword" ? "tempPassword" : "setPasswordUrl"
   );
   const [loginEmail, setLoginEmail] = useState(initialCred?.loginEmail ?? "");
-  const [setPasswordUrl, setSetPasswordUrl] = useState(
-    initialCred?.kind === "setPasswordUrl" ? initialCred.setPasswordUrl ?? "" : ""
-  );
+  const [passwordUrl, setPasswordUrl] = useState(
+  initialCred?.kind === "setPasswordUrl" ? initialCred?.setPasswordUrl ?? "" : ""
+);
   const [tempPassword, setTempPassword] = useState(
     initialCred?.kind === "tempPassword" ? initialCred.tempPassword ?? "" : ""
   );
@@ -254,7 +254,6 @@ export default function AppActionsDrawer({
     navigate(qs ? `/flow/${wfId}?${qs}` : `/flow/${wfId}`);
   }
 
-  // refresh ao abrir
   useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -271,11 +270,11 @@ export default function AppActionsDrawer({
           if (c) {
             setCredKind(c.kind === "tempPassword" ? "tempPassword" : "setPasswordUrl");
             setLoginEmail(c.loginEmail ?? "");
-            setSetPasswordUrl((c as any).setPasswordUrl ?? "");
+            setPasswordUrl((c as any).setPasswordUrl ?? "");
             setTempPassword((c as any).tempPassword ?? "");
           } else {
             setLoginEmail("");
-            setSetPasswordUrl("");
+            setPasswordUrl("");   // ✅ agora usa o setter certo
             setTempPassword("");
           }
 
@@ -293,7 +292,7 @@ export default function AppActionsDrawer({
         setUrls((initialUrls ?? []).map(u => ({ ...u, id: u.id || uuid(), editing: false })));
         setCredKind(initialCred?.kind === "tempPassword" ? "tempPassword" : "setPasswordUrl");
         setLoginEmail(initialCred?.loginEmail ?? "");
-        setSetPasswordUrl(
+        setPasswordUrl(
           initialCred?.kind === "setPasswordUrl" ? initialCred?.setPasswordUrl ?? "" : ""
         );
         setTempPassword(
@@ -313,7 +312,7 @@ export default function AppActionsDrawer({
         setUrls((initialUrls ?? []).map(u => ({ ...u, id: u.id || uuid(), editing: false })));
         setCredKind(initialCred?.kind === "tempPassword" ? "tempPassword" : "setPasswordUrl");
         setLoginEmail(initialCred?.loginEmail ?? "");
-        setSetPasswordUrl(
+        setPasswordUrl(
           initialCred?.kind === "setPasswordUrl" ? initialCred?.setPasswordUrl ?? "" : ""
         );
         setTempPassword(
@@ -333,27 +332,33 @@ export default function AppActionsDrawer({
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+
   const cred: AdminCred | null = useMemo(() => {
-    if (!loginEmail.trim()) return null;
-    if (credKind === "setPasswordUrl" && setPasswordUrl.trim()) {
-      return {
-        kind: "setPasswordUrl",
-        loginEmail: loginEmail.trim(),
-        setPasswordUrl: setPasswordUrl.trim(),
-      };
-    }
-    if (credKind === "tempPassword" && tempPassword.trim()) {
-      return {
-        kind: "tempPassword",
-        loginEmail: loginEmail.trim(),
-        tempPassword: tempPassword.trim(),
-      };
-    }
-    return null;
-  }, [credKind, loginEmail, setPasswordUrl, tempPassword]);
+      if (!loginEmail.trim()) return null;
+
+      if (credKind === "setPasswordUrl" && passwordUrl.trim()) {
+        return {
+          kind: "setPasswordUrl",
+          loginEmail: loginEmail.trim(),
+          setPasswordUrl: passwordUrl.trim(),
+        };
+      }
+
+      if (credKind === "tempPassword" && tempPassword.trim()) {
+        return {
+          kind: "tempPassword",
+          loginEmail: loginEmail.trim(),
+          tempPassword: tempPassword.trim(),
+        };
+      }
+
+      return null;
+    }, [credKind, loginEmail, passwordUrl, tempPassword]);
+
+
 
   async function handleSaveAll() {
     const cleaned = urls.map(u => ({
@@ -383,6 +388,7 @@ export default function AppActionsDrawer({
       if (onSaveCred) await onSaveCred(cred);
       if (onSaveImages) await onSaveImages(imagesPayload);
     }
+
 
     onSaved?.({ urls: cleaned, cred });
     await onAfterSave?.();
@@ -482,11 +488,12 @@ export default function AppActionsDrawer({
             setCredKind={setCredKind}
             loginEmail={loginEmail}
             setLoginEmail={setLoginEmail}
-            setPasswordUrl={setSetPasswordUrl}
-            setSetPasswordUrl={setSetPasswordUrl}
+            passwordUrl={passwordUrl}
+            setPasswordUrl={setPasswordUrl}
             tempPassword={tempPassword}
             setTempPassword={setTempPassword}
           />
+
 
           <ImageEditorSection initial={images} onChange={handleImagesChange} />
         </div>

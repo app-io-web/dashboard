@@ -2,26 +2,27 @@
 import { KeyRound } from "lucide-react";
 import type { AdminCred } from "../types";
 
+type Props = {
+  credKind: AdminCred["kind"];
+  setCredKind: (k: AdminCred["kind"]) => void;
+  loginEmail: string;
+  setLoginEmail: (s: string) => void;
+  passwordUrl: string;
+  setPasswordUrl: (s: string) => void;
+  tempPassword: string;
+  setTempPassword: (s: string) => void;
+};
 
 export function AdminCredSection({
   credKind,
   setCredKind,
   loginEmail,
   setLoginEmail,
+  passwordUrl,
   setPasswordUrl,
-  setSetPasswordUrl,
   tempPassword,
   setTempPassword,
-}: {
-  credKind: AdminCred["kind"];
-  setCredKind: (k: AdminCred["kind"]) => void;
-  loginEmail: string;
-  setLoginEmail: (s: string) => void;
-  setPasswordUrl: string;
-  setSetPasswordUrl: (s: string) => void;
-  tempPassword: string;
-  setTempPassword: (s: string) => void;
-}) {
+}: Props) {
   return (
     <section>
       <h3 className="mb-3 flex items-center gap-2 text-base font-semibold">
@@ -63,12 +64,14 @@ export function AdminCredSection({
         {credKind === "setPasswordUrl" ? (
           <div className="grid gap-2">
             <input
-              value={setPasswordUrl}
-              onChange={e => setSetPasswordUrl(e.target.value)}
+              value={passwordUrl}
+              onChange={e => setPasswordUrl(e.target.value)}
               placeholder="https://exemplo.com/definir-senha/..."
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
             />
-            <p className="text-xs text-slate-500">Use o link oficial de primeiro acesso/definição de senha.</p>
+            <p className="text-xs text-slate-500">
+              Use o link oficial de primeiro acesso/definição de senha.
+            </p>
           </div>
         ) : (
           <div className="grid gap-2">
@@ -78,7 +81,9 @@ export function AdminCredSection({
               placeholder="Senha provisória segura"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
             />
-            <p className="text-xs text-slate-500">Evite reuso. Recomende troca no primeiro login.</p>
+            <p className="text-xs text-slate-500">
+              Evite reuso. Recomende troca no primeiro login.
+            </p>
           </div>
         )}
       </div>
