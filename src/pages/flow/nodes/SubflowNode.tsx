@@ -20,21 +20,40 @@ export default function SubflowNode({ data, selected }: NodeProps<Data>) {
     (data?.icon && icons[data.icon as keyof typeof icons]) || Share2;
 
   const handleOpenTargetFlow = () => {
-    if (!data?.targetFlowId) return;
+  if (!data?.targetFlowId) return;
 
-    // pega o empresaId da URL atual (do fluxo pai)
-    const sp = new URLSearchParams(window.location.search);
-    const empresaId = sp.get("empresaId");
+  // empresaId do fluxo pai
+  const sp = new URLSearchParams(window.location.search);
+  const empresaId = sp.get("empresaId");
 
-    // monta a URL final do fluxo de destino
-    let url = `/flow/${data.targetFlowId}`;
-    if (empresaId) {
-      url += `?empresaId=${empresaId}`;
-    }
+  // base configurada no Vite (ex: "/dashboard/")
+  const basePath =
+    (import.meta as any).env?.BASE_URL && (import.meta as any).env.BASE_URL !== "/"
+      ? (import.meta as any).env.BASE_URL
+      : "/";
 
-    // abre em nova guia
-    window.open(url, "_blank", "noopener,noreferrer");
+  const hasHashRouter = !!window.location.hash; // se tem "#/..." na URL
+
+  // monta o caminho do fluxo de destino
+  let path = `flow/${data.targetFlowId}`;
+  if (empresaId) {
+    path += `?empresaId=${empresaId}`;
+  }
+
+  let finalUrl: string;
+
+  if (hasHashRouter) {
+    // caso GitHub Pages + HashRouter => /dashboard/#/flow/...
+    finalUrl = `${window.location.origin}${basePath}#/${path}`;
+  } else {
+    // caso Netlify/BrowserRouter => /dashboard/flow/... ou /flow/...
+    // basePath já cuida se for / ou /dashboard/
+    finalUrl = `${window.location.origin}${basePath}${path}`;
+  }
+
+  window.open(finalUrl, "_blank", "noopener,noreferrer");
   };
+
 
   return (
     <div
