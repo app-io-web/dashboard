@@ -16,7 +16,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { mailer } from "@/lib/http";
+import { api } from "@/lib/http";
 import SideMenu from "@/components/SideMenu";
 import { clearAuth } from "@/lib/auth";
 
@@ -134,7 +134,7 @@ export default function SmtpPage() {
   async function fetchServer() {
     setLoading(true);
     try {
-      const r = await mailer.get("/smtp");
+      const r = await api.get("/smtp");   // << trocado
       const d = normalizeIn(r.data);
       serverSnapshotRef.current = d;
       reset(d, { keepDirty: false });
@@ -152,6 +152,7 @@ export default function SmtpPage() {
       setLoading(false);
     }
   }
+
   useEffect(() => {
     fetchServer();
   }, []);
@@ -167,37 +168,39 @@ export default function SmtpPage() {
 
   /* --------- Ações --------- */
   const onSave = handleSubmit(async (values) => {
-    setTestState("idle");
-    setTestMsg(null);
-    await mailer.put("/smtp", normalizeOut(values));
-    setLastSaved({ at: new Date(), ok: true });
-    serverSnapshotRef.current = values;
+  setTestState("idle");
+  setTestMsg(null);
+  await api.put("/smtp", normalizeOut(values));  // << trocado
+  setLastSaved({ at: new Date(), ok: true });
+  serverSnapshotRef.current = values;
   });
 
+
   const onTest = handleSubmit(async (values) => {
-  setTestState("sending");
-  setTestMsg(null);
-  try {
-    const toRequested = values.testEmail || values.fromEmail;
-    const r = await mailer.post("/smtp/test", { to: toRequested });
+    setTestState("sending");
+    setTestMsg(null);
+    try {
+      const toRequested = values.testEmail || values.fromEmail;
+      const r = await api.post("/smtp/test", { to: toRequested }); // << trocado
 
-    const realTo = r?.data?.to || toRequested;
+      const realTo = r?.data?.to || toRequested;
 
-    setTestState("ok");
-    setTestMsg(
-      typeof r?.data?.message === "string"
-        ? r.data.message
-        : `E-mail de teste enviado para ${realTo}.`
-    );
-  } catch (e: any) {
-    setTestState("err");
-    const msg =
-      e?.response?.data?.message ||
-      e?.message ||
-      "Falha ao enviar e-mail de teste.";
-    setTestMsg(msg);
-  }
-});
+      setTestState("ok");
+      setTestMsg(
+        typeof r?.data?.message === "string"
+          ? r.data.message
+          : `E-mail de teste enviado para ${realTo}.`
+      );
+    } catch (e: any) {
+      setTestState("err");
+      const msg =
+        e?.response?.data?.message ||
+        e?.message ||
+        "Falha ao enviar e-mail de teste.";
+      setTestMsg(msg);
+    }
+  });
+
 
 
   const onReload = () => fetchServer();

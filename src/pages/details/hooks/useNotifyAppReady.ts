@@ -1,6 +1,6 @@
 // src/pages/details/hooks/useNotifyAppReady.ts
 import { useState } from "react";
-import { mailer } from "@/lib/http";
+import { api } from "@/lib/http";
 
 type EmailAddress = string | { name?: string; address: string };
 
@@ -9,7 +9,35 @@ type CredTemp = { loginEmail: string; tempPassword: string; setPasswordUrl?: nev
 export type Cred = CredLink | CredTemp;
 
 export interface AppReadyEmailPayload {
-  to: EmailAddress | EmailAddress[];   // ← era toList
+  to: EmailAddress | EmailAddress[];
+  subject: string;
+  from?: EmailAddress;
+  data: {
+    title?: string;
+    app: any;
+    imageSquareUrl?: string | null;
+    imageWideUrl?: string | null;
+    cred?: Cred;
+    notes?: string;
+  };
+}
+
+
+// src/pages/details/hooks/useNotifyAppReady.ts
+import { useState } from "react";
+// troque isso:
+// import { mailer } from "@/lib/http";
+// por isso:
+import { api } from "@/lib/http";
+
+type EmailAddress = string | { name?: string; address: string };
+
+type CredLink = { loginEmail: string; setPasswordUrl: string; tempPassword?: never };
+type CredTemp = { loginEmail: string; tempPassword: string; setPasswordUrl?: never };
+export type Cred = CredLink | CredTemp;
+
+export interface AppReadyEmailPayload {
+  to: EmailAddress | EmailAddress[];
   subject: string;
   from?: EmailAddress;
   data: {
@@ -28,7 +56,8 @@ export function useNotifyAppReady() {
   async function sendAppReadyEmail(payload: AppReadyEmailPayload) {
     setLoading(true);
     try {
-      await mailer.post("/emails/app-ready", payload);
+      // usa o client com Bearer
+      await api.post("/emails/app-ready", payload);
     } finally {
       setLoading(false);
     }
@@ -36,3 +65,4 @@ export function useNotifyAppReady() {
 
   return { sendAppReadyEmail, loading };
 }
+

@@ -2,7 +2,7 @@ import SideMenu from "@/components/SideMenu";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, User2, ShieldCheck, KeyRound, ChevronRight, RefreshCw, PanelLeft, LogOut } from "lucide-react";
-import { mailer } from "@/lib/http";
+import { api } from "@/lib/http";
 import { clearAuth } from "@/lib/auth";
 
 type ConfigSummary = {
@@ -53,26 +53,31 @@ export default function SettingsHome() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let alive = true;
+  let alive = true;
 
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const r = await mailer.get<ConfigSummary>("/api/config/summary");
-        if (alive) setSummary(r.data);
-      } catch (e: any) {
-        const msg = e?.response?.data?.error || e?.message || "Falha ao carregar status";
-        if (alive) setError(msg);
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
+  (async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // usa o client certo: api
+      const r = await api.get<ConfigSummary>("/api/config/summary");
+      if (alive) setSummary(r.data);
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.error ||
+        e?.message ||
+        "Falha ao carregar status";
+      if (alive) setError(msg);
+    } finally {
+      if (alive) setLoading(false);
+    }
+  })();
 
-    return () => {
-      alive = false;
-    };
-  }, []);
+  return () => {
+    alive = false;
+  };
+}, []);
+
 
   const items = useMemo(() => buildItems(summary, loading), [summary, loading]);
 
