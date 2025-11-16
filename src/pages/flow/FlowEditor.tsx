@@ -8,7 +8,14 @@ import {
   type Edge as RFEdge,
 } from "reactflow";
 
-import { PanelLeft, PanelRight, Trash2, Link2, Unlink2 } from "lucide-react";
+import {
+  PanelLeft,
+  PanelRight,
+  Trash2,
+  Link2,
+  Unlink2,
+  Share2, // 👈 NOVO
+} from "lucide-react";
 
 import FlowCanvas from "./components/FlowCanvas";
 import Sidebar from "./components/Sidebar";
@@ -186,6 +193,17 @@ function FlowEditorInner({
       (e) => e.source === selectedNode.id || e.target === selectedNode.id
     );
 
+  // 🎯 Subflow selecionado? (usa presença de targetFlowId)
+  const selectedSubflowTargetFlowId: string | null =
+    (selectedNode?.data as any)?.targetFlowId ?? null;
+
+  const canGoToSubflow = !!selectedSubflowTargetFlowId;
+
+  const handleGoToSubflow = () => {
+    if (!canGoToSubflow) return;
+    navigate(`/flow/${selectedSubflowTargetFlowId}?empresaId=${empresaId}`);
+  };
+
   // 🔍 Helper: achar nó pelo id
   const findNodeById = (id: string | null | undefined): RFNode | undefined => {
     if (!id) return undefined;
@@ -227,7 +245,10 @@ function FlowEditorInner({
   };
 
   // 🚫 Regra: evita enfiar várias entradas de dado num nó que deveria ter uma só
-  const canConnectDataToTarget = (target?: RFNode, existingEdges?: RFEdge[]): boolean => {
+  const canConnectDataToTarget = (
+    target?: RFNode,
+    existingEdges?: RFEdge[]
+  ): boolean => {
     if (!target) return true;
 
     const edgesList = existingEdges ?? (edges as RFEdge[]);
@@ -454,6 +475,18 @@ function FlowEditorInner({
               <Unlink2 className="w-4 h-4" />
               Desconectar nó
             </button>
+
+            {/* 🔁 Botão "Ir para fluxo" (aparece só em Subflow) */}
+            {canGoToSubflow && (
+              <button
+                type="button"
+                onClick={handleGoToSubflow}
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium shadow-md border bg-blue-50 border-blue-200 text-blue-700"
+              >
+                <Share2 className="w-4 h-4" />
+                Ir para fluxo
+              </button>
+            )}
 
             {/* 🧨 Botão de excluir nó ao lado dos outros */}
             <button
