@@ -21,75 +21,54 @@ import AppActionsDrawer, {
 import { useSaveAppActions } from "./hooks/useSaveAppActions";
 
 // util p/ redimensionar quando autoResize = true
-// util p/ redimensionar quando autoResize = true
-async function resizeImageTo(file: File, w: number, h: number) {
-  // helper: tenta obter um bitmap a partir do File
-  async function getBitmapFromFile(f: File): Promise<ImageBitmap | HTMLImageElement> {
-    if ("createImageBitmap" in window) {
-      try {
-        // ✅ o tipo aceito é Blob/File, não ArrayBuffer
-        return await createImageBitmap(f);
-      } catch {
-        // segue para fallback
-      }
-    }
-    // Fallback: carrega via <img> + objectURL
-    const url = URL.createObjectURL(f);
-    try {
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const el = new Image();
-        el.onload = () => resolve(el);
-        el.onerror = reject;
-        el.src = url;
-      });
-      return img;
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
+async function resizeImageTo(file: File, maxW: number, maxH: number): Promise<File> {
+  // 1) se não for imagem, nem mexe
+  if (!file.type.startsWith("image/")) return file;
 
-  // Se algo der errado, devolve o original
-  try {
-    const src = await getBitmapFromFile(file);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-
-    const srcW = (src as any).width;
-    const srcH = (src as any).height;
-
-    const srcRatio = srcW / srcH;
-    const dstRatio = w / h;
-
-    let sx = 0, sy = 0, sw = srcW, sh = srcH;
-    if (srcRatio > dstRatio) {
-      // fonte mais larga: corta laterais
-      const newW = srcH * dstRatio;
-      sx = (srcW - newW) / 2;
-      sw = newW;
-    } else if (srcRatio < dstRatio) {
-      // fonte mais alta: corta topo/baixo
-      const newH = srcW / dstRatio;
-      sy = (srcH - newH) / 2;
-      sh = newH;
-    }
-
-    ctx.drawImage(src as any, sx, sy, sw, sh, 0, 0, w, h);
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.92)
-    );
-    if (!blob) return file;
-
-    const base = file.name.replace(/\.(png|jpe?g|webp|gif)$/i, "");
-    return new File([blob], `${base}-${w}x${h}.jpg`, { type: "image/jpeg" });
-  } catch {
+  // 2) NÃO mexe em GIF (senão mata animação)
+  if (file.type === "image/gif" || file.name.toLowerCase().endsWith(".gif")) {
     return file;
   }
+
+  // 3) tenta criar o bitmap
+  const bitmap = await createImageBitmap(file);
+  let { width, height } = bitmap;
+
+  // se já está menor, não precisa redimensionar
+  if (width <= maxW && height <= maxH) {
+    return file;
+  }
+
+  const ratio = Math.min(maxW / width, maxH / height);
+  const targetW = Math.round(width * ratio);
+  const targetH = Math.round(height * ratio);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+
+  ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+
+  // gera PNG por padrão (sem zoar a qualidade tanto)
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Falha ao gerar blob."))),
+      "image/png",
+      0.9,
+    );
+  });
+
+  // mantém um nome coerente
+  const originalName = file.name || "image";
+  const base = originalName.replace(/\.[^/.]+$/, ""); // tira a extensão
+  const newName = `${base}.png`;
+
+  return new File([blob], newName, { type: blob.type || "image/png" });
 }
+
 
 
 export default function DetailsPage() {
@@ -226,95 +205,112 @@ export default function DetailsPage() {
 
 
       {app && (
-          <AppActionsDrawer
-            open={actionsOpen}
-            onClose={() => setActionsOpen(false)}
-            empresaId={app.empresaId}     // agora é seguro
-            appId={app.id}
-            appName={app.nome}
-            initialUrls={(app as any)?.importantUrls ?? []}
-            initialCred={(app as any)?.adminCred ?? (app as any)?.adminCredential ?? {}}
-            initialImages={{
-              imageSquareUrl: (app as any)?.imageSquareUrl ?? (app as any)?.logoUrl ?? null,
-              imageWideUrl: (app as any)?.imageWideUrl ?? null,
-              // @ts-expect-error compat
-              logoUrl: (app as any)?.logoUrl ?? null,
-            }}
-            onRefresh={async () => {
-              const appKey = app.ref ?? app.id;
-              if (!appKey) return;
-              const { data } = await api.get(`/apps/${encodeURIComponent(String(appKey))}`);
-              return {
-                urls: data?.importantUrls ?? [],
-                cred: data?.adminCredential ?? null,
-                images: {
-                  imageSquareUrl: data?.imageSquareUrl ?? data?.logoUrl ?? null,
-                  imageWideUrl: data?.imageWideUrl ?? null,
-                  logoUrl: data?.logoUrl ?? null,
-                },
-              };
-            }}
-            onSaveAll={async ({ urls, cred, images }) => {
-              const appKey = app.ref ?? app.id;
-              if (!appKey) throw new Error("app key ausente (ref/id)");
+        <AppActionsDrawer
+          open={actionsOpen}
+          onClose={() => setActionsOpen(false)}
+          empresaId={app.empresaId}
+          appId={app.id}
+          appName={app.nome}
+          initialUrls={(app as any)?.importantUrls ?? []}
+          initialCred={(app as any)?.adminCred ?? (app as any)?.adminCredential ?? {}}
+          initialImages={{
+            imageSquareUrl: (app as any)?.imageSquareUrl ?? (app as any)?.logoUrl ?? null,
+            imageWideUrl: (app as any)?.imageWideUrl ?? null,
+            // @ts-expect-error compat
+            logoUrl: (app as any)?.logoUrl ?? null,
+          }}
+          onRefresh={async () => {
+            const appKey = app.ref ?? app.id;
+            if (!appKey) return;
 
-              // ----------- 1) sobe imagens se tiver arquivo novo ----------
-              const finalImages: any = {};
+            const { data } = await api.get(`/apps/${encodeURIComponent(String(appKey))}`);
 
-              if (images?.square?.file) {
-                const f = images.square.file;
-                const fd = new FormData();
-                fd.append("file", f);
-                fd.append("kind", "square");
+            return {
+              urls: data?.importantUrls ?? [],
+              cred: data?.adminCredential ?? null,
+              images: {
+                imageSquareUrl: data?.imageSquareUrl ?? data?.logoUrl ?? null,
+                imageWideUrl: data?.imageWideUrl ?? null,
+                logoUrl: data?.logoUrl ?? null,
+              },
+            };
+          }}
+          onSaveAll={async ({ urls, cred, images }) => {
+            const appKey = app.ref ?? app.id;
+            if (!appKey) throw new Error("app key ausente (ref/id)");
 
-                const up = await api.post(
-                  `/apps/${encodeURIComponent(String(appKey))}/upload-image`,
-                  fd,
-                  { headers: { "Content-Type": "multipart/form-data" } }
-                );
+            // ----------- 1) sobe imagens se tiver arquivo novo ----------
+            const finalImages: any = {};
 
-                finalImages.imageSquareUrl = up.data?.url ?? null;
-              } else if (images?.square?.url) {
+            if (images) {
+              // SQUARE
+              if (images.square?.file) {
+                let f = images.square.file;
+
+                if (images.autoResize) {
+                  f = await resizeImageTo(f, 1000, 1000); // quadrado 1000x1000
+                }
+
+                finalImages.imageSquareUrl = await uploadLogo(f, {
+                  appId: String(appKey),
+                  type: "square",
+                });
+              } else if (images.square?.url) {
                 finalImages.imageSquareUrl = images.square.url;
               }
 
-              if (images?.wide?.file) {
-                const f = images.wide.file;
-                const fd = new FormData();
-                fd.append("file", f);
-                fd.append("kind", "wide");
+              // WIDE
+              if (images.wide?.file) {
+                let f = images.wide.file;
 
-                const up = await api.post(
-                  `/apps/${encodeURIComponent(String(appKey))}/upload-image`,
-                  fd,
-                  { headers: { "Content-Type": "multipart/form-data" } }
-                );
+                if (images.autoResize) {
+                  f = await resizeImageTo(f, 1920, 1080); // wide 1920x1080
+                }
 
-                finalImages.imageWideUrl = up.data?.url ?? null;
-              } else if (images?.wide?.url) {
+                finalImages.imageWideUrl = await uploadLogo(f, {
+                  appId: String(appKey),
+                  type: "wide",
+                });
+              } else if (images.wide?.url) {
                 finalImages.imageWideUrl = images.wide.url;
               }
+            }
 
-              // ----------- 2) envia URLs + credencial + imagens ----------
-              await api.patch(`/apps/${encodeURIComponent(String(appKey))}`, {
-                importantUrls: urls,
-                adminCredential: cred,
-                ...finalImages,
-              });
+            // ----------- 2) envia URLs + credencial + imagens ----------
+            await api.patch(`/apps/${encodeURIComponent(String(appKey))}`, {
+              importantUrls: urls,
+              adminCredential: cred,
+              ...finalImages,
+            });
 
-              // ----------- 3) dispara revalidação SWR -----------
+            // ----------- 3) pega app atualizado p/ devolver p/ o Drawer ----------
+            const { data } = await api.get(`/apps/${encodeURIComponent(String(appKey))}`);
+
+            // ----------- 4) dispara revalidação SWR (página Details) -----------
+            if (typeof mutate === "function") {
+              await (mutate as any)(undefined, { revalidate: true });
+            }
+
+            // ⚠️ IMPORTANTE: retornar no formato que o Drawer espera
+            return {
+              urls: data?.importantUrls ?? [],
+              cred: data?.adminCredential ?? null,
+              images: {
+                imageSquareUrl: data?.imageSquareUrl ?? data?.logoUrl ?? null,
+                imageWideUrl: data?.imageWideUrl ?? null,
+                logoUrl: data?.logoUrl ?? null,
+              },
+            };
+          }}
+          onAfterSave={async () => {
               if (typeof mutate === "function") {
                 await (mutate as any)(undefined, { revalidate: true });
               }
+              window.location.reload(); // ← RECARREGA A PÁGINA
             }}
+        />
+      )}
 
-            onAfterSave={async () => {
-              if (typeof mutate === "function") {
-                await (mutate as any)(undefined, { revalidate: true });
-              }
-            }}
-          />
-        )}
 
       <ToastHost />
     </main>

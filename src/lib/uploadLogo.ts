@@ -1,34 +1,23 @@
 // src/lib/uploadLogo.ts
-import axios from "axios";
+import { api } from "@/lib/http";
 import { getAccessToken } from "@/lib/auth";
 
-export async function uploadLogo(
-  file: File,
-  a?: string | { appId?: string | null; type?: "logo" | "square" | "wide" },
-  b?: "logo" | "square" | "wide"
-) {
-  const baseURL = import.meta.env.VITE_API_URL || "http://localhost:3333";
+type UploadLogoOpts = {
+  appId?: string | null;
+  type?: "logo" | "square" | "wide";
+};
 
-  let appId: string | undefined;
-  let type: "logo" | "square" | "wide" = "logo";
-
-  if (typeof a === "string") {
-    appId = a;
-    if (b) type = b;
-  } else if (a && typeof a === "object") {
-    appId = a.appId ?? undefined;
-    if (a.type) type = a.type;
-  }
-
+export async function uploadLogo(file: File, opts: UploadLogoOpts = {}) {
   const form = new FormData();
   form.append("file", file);
-  if (appId) form.append("appId", appId);
+
+  if (opts.appId) form.append("appId", String(opts.appId));
   form.append("fileName", file.name);
-  form.append("type", type);
+  form.append("type", opts.type ?? "logo");
 
   const token = getAccessToken();
 
-  const { data } = await axios.post(`${baseURL}/upload/logo`, form, {
+  const { data } = await api.post("/upload/logo", form, {
     headers: {
       "Content-Type": "multipart/form-data",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -36,6 +25,9 @@ export async function uploadLogo(
     timeout: 20000,
   });
 
-  if (!data?.url) throw new Error(data?.message || "Falha no upload.");
+  if (!data?.url) {
+    throw new Error(data?.message || "Falha no upload.");
+  }
+
   return data.url as string;
 }
