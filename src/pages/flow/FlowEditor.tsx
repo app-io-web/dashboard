@@ -1,9 +1,9 @@
 // pages/flow/FlowEditor.tsx
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ReactFlowProvider } from "reactflow";
-import type { Node as RFNode } from "reactflow";
-import { PanelLeft, PanelRight } from "lucide-react";
+import { ReactFlowProvider, type Node as RFNode, type Connection, type Edge as RFEdge } from "reactflow";
+
+import { PanelLeft, PanelRight, Trash2, Link2, Unlink2 } from "lucide-react";
 
 import FlowCanvas from "./components/FlowCanvas";
 import Sidebar from "./components/Sidebar";
@@ -71,6 +71,10 @@ function FlowEditorInner({
   const [openBlocks, setOpenBlocks] = useState(false);
   const [openInspector, setOpenInspector] = useState(false);
 
+  // 🔗 Modo conectar (mobile)
+  const [connectMode, setConnectMode] = useState(false);
+  const [connectSourceId, setConnectSourceId] = useState<string | null>(null);
+
   useEffect(() => {
     setCurrentApp(app ?? null);
   }, [app]);
@@ -126,6 +130,226 @@ function FlowEditorInner({
     ]);
   };
 
+  // 🔴 Deletar nó selecionado (usado no mobile)
+  const handleDeleteSelectedNode = () => {
+    if (!selectedNode) return;
+
+    const nodeId = selectedNode.id;
+
+    onNodesChange([
+      {
+        id: nodeId,
+        type: "remove",
+      } as any,
+    ]);
+
+    setSelectedNode(null);
+    setOpenInspector(false);
+
+    // garante que não fique preso em modo conexão com nó que já sumiu
+    if (connectSourceId === nodeId) {
+      setConnectSourceId(null);
+      setConnectMode(false);
+    }
+  };
+
+    // 🔌 Desconectar todas as conexões do nó selecionado (mobile)
+  const handleDisconnectSelectedNode = () => {
+    if (!selectedNode) return;
+
+    const nodeId = selectedNode.id;
+
+    // filtra as edges que tocam nesse nó
+    const connectedEdges = edges.filter(
+      (e) => e.source === nodeId || e.target === nodeId
+    );
+
+    if (connectedEdges.length === 0) return;
+
+    // cria mudanças de remoção para cada edge
+    const changes = connectedEdges.map(
+      (edge) =>
+        ({
+          id: edge.id,
+          type: "remove",
+        } as any)
+    );
+
+    onEdgesChange(changes);
+  };
+
+  // se dá pra desconectar (tem nó selecionado E alguma edge ligada nele)
+  const canDisconnect =
+    !!selectedNode &&
+    edges.some(
+      (e) => e.source === selectedNode.id || e.target === selectedNode.id
+    );
+
+
+  // 🔗 Lógica de clique em nó no MOBILE (tap-to-connect)
+  const handleMobileNodeClick = (node: RFNode) => {
+    // Se estiver em modo conectar, usamos toques pra criar aresta
+    if (connectMode) {
+      // 1º toque: escolhe a origem
+      if (!connectSourceId) {
+        setConnectSourceId(node.id);
+        setSelectedNode(node);
+        return;
+      }
+
+      // 2º toque: escolhe o destino
+      if (connectSourceId && connectSourceId !== node.id) {
+        const connection: Connection = {
+          source: connectSourceId,
+          target: node.id,
+        };
+
+        // 🧠 usa o conector inteligente
+        handleSmartConnect(connection);
+      }
+
+
+      // Reseta estado depois da tentativa
+      setConnectSourceId(null);
+      setConnectMode(false);
+      return;
+    }
+
+    // Comportamento normal: selecionar e abrir inspector
+    setSelectedNode(node);
+    setOpenInspector(true);
+  };
+
+  // Quando clica no "vazio" do canvas em mobile
+  const handleMobilePaneClick = () => {
+    setSelectedNode(null);
+    setOpenInspector(false);
+
+    // Sai do modo conectar e limpa origem
+    setConnectMode(false);
+    setConnectSourceId(null);
+  };
+
+  // Quando alterna o modo conectar
+  const toggleConnectMode = () => {
+    // se desativar, limpa origem
+    setConnectMode((prev) => {
+      const next = !prev;
+      if (!next) {
+        setConnectSourceId(null);
+      }
+      return next;
+    });
+  };
+
+    // 🔍 Helper: achar nó pelo id
+  const findNodeById = (id: string | null | undefined): RFNode | undefined => {
+    if (!id) return undefined;
+    return nodes.find((n) => n.id === id);
+  };
+
+  type EdgeKind = "data" | "decision-yes" | "decision-no";
+
+  // 🧠 Descobre se essa conexão devia ser "data" ou "decision-(yes/no)"
+  const inferEdgeKind = (
+    source?: RFNode,
+    _target?: RFNode,
+    existingEdges?: RFEdge[]
+  ): EdgeKind => {
+    if (!source) return "data";
+
+    const edgesList = existingEdges ?? (edges as RFEdge[]);
+    const sourceType = (source.type ?? "").toLowerCase();
+
+    // Convenção: qualquer nó que tenha "decision", "cond" ou "if" no type é nó de decisão
+    const isDecisionSource =
+      sourceType.includes("decision") ||
+      sourceType.includes("cond") ||
+      sourceType.includes("if");
+
+    if (!isDecisionSource) return "data";
+
+    const outgoing = edgesList.filter((e) => e.source === source.id);
+    const hasYes = outgoing.some((e) => (e.data as any)?.kind === "decision-yes");
+    const hasNo = outgoing.some((e) => (e.data as any)?.kind === "decision-no");
+
+    // 1ª saída do nó de decisão → SIM
+    if (!hasYes) return "decision-yes";
+    // 2ª saída → NÃO
+    if (!hasNo) return "decision-no";
+
+    // Já tem SIM e NÃO: o resto vira "data" mesmo (ou você pode bloquear)
+    return "data";
+  };
+
+  // 🚫 Regra: evita enfiar várias entradas de dado num nó que deveria ter uma só
+  const canConnectDataToTarget = (target?: RFNode, existingEdges?: RFEdge[]): boolean => {
+    if (!target) return true;
+
+    const edgesList = existingEdges ?? (edges as RFEdge[]);
+    const targetType = (target.type ?? "").toLowerCase();
+
+    // Nó que explicitamente aceita múltiplas entradas (merge, join, router etc)
+    const allowsMultipleInputs =
+      targetType.includes("merge") ||
+      targetType.includes("join") ||
+      targetType.includes("router");
+
+    if (allowsMultipleInputs) return true;
+
+    const incomingData = edgesList.filter(
+      (e) => e.target === target.id && (((e.data as any)?.kind as EdgeKind | undefined) ?? "data") === "data"
+    );
+
+    // Se já tem uma entrada de dado, bloqueia novas
+    return incomingData.length === 0;
+  };
+
+  // 💡 Conector inteligente: usado tanto no desktop quanto no mobile
+  const handleSmartConnect = (connection: Connection) => {
+    const sourceNode = findNodeById(connection.source);
+    const targetNode = findNodeById(connection.target);
+
+    if (!sourceNode || !targetNode) {
+      // fallback: se não achar, manda pro onConnect normal
+      onConnect(connection);
+      return;
+    }
+
+    const kind = inferEdgeKind(sourceNode, targetNode, edges as RFEdge[]);
+
+    // Se for conexão de dado e o target já tem uma entrada, bloqueia
+    if (kind === "data" && !canConnectDataToTarget(targetNode, edges as RFEdge[])) {
+      // aqui daria pra disparar toast depois, se quiser
+      console.warn("[Flow] Ignorando conexão: alvo já tem entrada de dados.");
+      return;
+    }
+
+    const previousData = (connection as any).data ?? {};
+    const previousLabel = (connection as any).label;
+
+    const label =
+      kind === "decision-yes"
+        ? "Sim"
+        : kind === "decision-no"
+        ? "Não"
+        : previousLabel;
+
+    const enhanced: Connection = {
+      ...connection,
+      data: {
+        ...previousData,
+        kind,
+      },
+      label,
+      // Conexão de dados pode ser animada, decisão fica reta
+      animated: kind === "data" ? true : (connection as any).animated,
+    };
+
+    onConnect(enhanced);
+  };
+
+
   return (
     <>
       <Toolbar
@@ -143,19 +367,20 @@ function FlowEditorInner({
         <div className="flex flex-1 overflow-hidden">
           <Sidebar onAddNode={addNode} />
 
-          <div className="flex-1 relative">
+            <div className="flex-1 relative">
             <FlowCanvas
               nodes={nodes}
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
+              onConnect={handleSmartConnect} // 🧠 CONECTAR INTELIGENTE
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}
               onDrop={onDrop}
               onDragOver={onDragOver}
             />
           </div>
+
 
           <NodePanel
             node={selectedNode}
@@ -168,23 +393,22 @@ function FlowEditorInner({
       {/* MOBILE / TABLET EM PÉ – canvas full + drawers */}
       {isMobile && (
         <div className="relative flex-1 overflow-hidden">
-          <FlowCanvas
+            <FlowCanvas
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={(_, node) => {
-              setSelectedNode(node);
-              setOpenInspector(true);
-            }}
-            onPaneClick={() => setSelectedNode(null)}
+            onConnect={handleSmartConnect} // 🧠 aqui também
+            onNodeClick={(_, node) => handleMobileNodeClick(node)}
+            onPaneClick={handleMobilePaneClick}
             onDrop={onDrop}
             onDragOver={onDragOver}
           />
 
-          {/* botões flutuantes */}
-          <div className="absolute top-3 left-3 z-20 flex gap-2">
+
+
+          {/* botões flutuantes topo-esquerda */}
+          <div className="absolute top-3 left-3 z-20 flex gap-2 flex-wrap">
             <button
               type="button"
               onClick={() => setOpenBlocks(true)}
@@ -207,7 +431,57 @@ function FlowEditorInner({
               <PanelRight className="w-4 h-4" />
               Editar nó
             </button>
+
+            {/* 🔗 Botão de modo conectar */}
+            <button
+              type="button"
+              onClick={toggleConnectMode}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium shadow-md border ${
+                connectMode
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white/95 border-gray-200 text-gray-800"
+              }`}
+            >
+              <Link2 className="w-4 h-4" />
+              {connectMode ? "Toque em 2 nós" : "Conectar nós"}
+            </button>
+
+            {/* 🔌 Botão de desconectar nó */}
+            <button
+              type="button"
+              disabled={!canDisconnect}
+              onClick={handleDisconnectSelectedNode}
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium shadow-md border ${
+                canDisconnect
+                  ? "bg-white/95 border-gray-200 text-gray-800"
+                  : "bg-gray-100 border-gray-200 text-gray-400"
+              }`}
+            >
+              <Unlink2 className="w-4 h-4" />
+              Desconectar nó
+            </button>
           </div>
+
+          {/* 🔴 Botão flutuante de deletar nó (mobile) */}
+          {selectedNode && (
+            <div className="absolute bottom-4 right-4 z-20">
+              <button
+                type="button"
+                onClick={handleDeleteSelectedNode}
+                className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-lg active:scale-95 transition"
+              >
+                <Trash2 className="w-4 h-4" />
+                Excluir nó
+              </button>
+            </div>
+          )}
+
+          {/* Dica visual quando estiver em modo conectar com origem escolhida */}
+          {connectMode && connectSourceId && (
+            <div className="absolute bottom-4 left-4 z-20 rounded-full bg-white/95 px-3 py-1 text-[11px] font-medium text-gray-700 shadow-md border border-blue-100">
+              Origem selecionada. Toque no nó destino para criar a conexão.
+            </div>
+          )}
 
           {/* Drawer: BLOCOs (Sidebar) */}
           {openBlocks && (

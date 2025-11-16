@@ -32,8 +32,15 @@ function draggablePayload(type: string) {
 export default function Sidebar({ onAddNode }: Props) {
   const [openStep, setOpenStep] = useState(true);
 
+  // Detecta ambiente touch (mobile/tablet)
+  const isTouch =
+    typeof window !== "undefined" && "ontouchstart" in window;
+
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
-    event.dataTransfer.setData("application/reactflow", draggablePayload(nodeType));
+    event.dataTransfer.setData(
+      "application/reactflow",
+      draggablePayload(nodeType)
+    );
     event.dataTransfer.effectAllowed = "move";
   };
 
@@ -49,11 +56,21 @@ export default function Sidebar({ onAddNode }: Props) {
     hint?: string;
   }) => (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, type)}
+      draggable={!isTouch} // 👉 só arrasta em desktop
+      onDragStart={
+        isTouch ? undefined : (e) => onDragStart(e, type)
+      }
+      // Mobile + Desktop: um clique/tap já adiciona o node
+      onClick={() => onAddNode(type)}
+      // Mantém o double-click pra quem curte no desktop
       onDoubleClick={() => onAddNode(type)}
-      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-move select-none border border-gray-200"
-      title={hint ?? "Arraste para o canvas ou dê duplo clique para inserir"}
+      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer select-none border border-gray-200"
+      title={
+        hint ??
+        (isTouch
+          ? "Toque para inserir este bloco"
+          : "Arraste para o canvas ou clique para inserir")
+      }
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -69,9 +86,13 @@ export default function Sidebar({ onAddNode }: Props) {
     <div className="w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto">
       <div className="sticky top-0 z-10 bg-white pb-3">
         <h2 className="text-lg font-bold">Blocos</h2>
-        <p className="text-xs pb-2 text-gray-500">Duplo clique ou arraste pro canvas</p>
+        <p className="text-xs pb-2 text-gray-500">
+          {isTouch
+            ? "Toque em um bloco para adicioná-lo ao fluxo"
+            : "Duplo clique ou arraste pro canvas"}
+        </p>
         <p className="text-xs text-blue-500">
-          Os Nodes são apenas Demostração de como Vai funcionar o fluxo do seu App
+          Os Nodes são apenas demonstração de como vai funcionar o fluxo do seu app
         </p>
       </div>
 
