@@ -16,6 +16,9 @@ import SessionTimer from "@/components/SessionTimer"; // ← Mantido
 import FlowList from "@/pages/flow/FlowList";
 import FlowEditor from "@/pages/flow/FlowEditor";
 import FlowSettings from "@/pages/flow/FlowSettings";
+import AdvancedConfigPage from "@/pages/details/AdvancedConfigPage";
+import UsersAdminPage from "@/pages/config/users/UsersAdminPage"; // 👈 NOVO
+
 
 export default function App() {
   return (
@@ -61,6 +64,18 @@ export default function App() {
             </RequireAuth>
           }
         />
+
+        <Route
+          path="/apps/:id/advanced-config"
+          element={
+            <RequireAuth>
+              <AdvancedConfigPage  />
+            </RequireAuth>
+          }
+        />
+
+
+        
 
         <Route
           path="/empresas"
@@ -169,6 +184,15 @@ export default function App() {
           element={
             <RequireAuth>
               <div className="p-6 text-white">Em breve: API Keys</div>
+            </RequireAuth>
+          }
+        />
+                {/* 👇 NOVO: página de usuários (conteúdo já faz check de superuser) */}
+        <Route
+          path="/config/users"
+          element={
+            <RequireAuth>
+              <UsersAdminPage />
             </RequireAuth>
           }
         />

@@ -1,6 +1,16 @@
 // src/pages/details/components/sections/ConfigSection.tsx
-import { Settings, ExternalLink, Terminal, Pencil, Cloud, Image as ImageIcon } from "lucide-react";
+import {
+  Settings,
+  ExternalLink,
+  Terminal,
+  Pencil,
+  Cloud,
+  Image as ImageIcon,
+  Info,
+  Server,
+} from "lucide-react";
 import { useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import Card from "../Card";
 import type { AppDetails } from "../../types";
 import { useSaveApp } from "../../hooks/useSaveApp";
@@ -61,12 +71,144 @@ function toNullIfEmpty(s: string | undefined | null) {
   return v.length ? v : null;
 }
 
+/* -------- helpers de HEALTH / SERVER STATUS -------- */
+
+type HealthUi = {
+  title: string;    // texto curto pro tooltip / ação
+  tooltip: string;  // texto completo do último resultado
+  iconClass: string;
+  dotClass: string;
+};
+
+// mesmo helper que usamos em outros lugares
+function parseServerExtra(raw: unknown): any {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      console.warn("serverExtraInfo inválido, não é JSON. Ignorando.");
+      return {};
+    }
+  }
+  if (typeof raw === "object") return raw as any;
+  return {};
+}
+
+function isAutoHealthEnabled(app: any): boolean {
+  const extra = parseServerExtra(app?.serverExtraInfo);
+  const hp = (extra as any)?.healthPrefs;
+  if (!hp || typeof hp !== "object") return false;
+  return Boolean((hp as any).enabled);
+}
+
+function formatWhen(whenRaw: any): string {
+  if (!whenRaw) return "";
+  const d = new Date(whenRaw);
+  if (Number.isNaN(d.getTime())) return "";
+  // formato curtinho pt-BR
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getHealthInfo(app: any): HealthUi {
+  const endpoint = app?.healthEndpointUrl as string | undefined;
+  const status = (app?.lastHealthStatus ?? "") as string;
+  const ms = app?.lastHealthMs as number | null | undefined;
+  const when = app?.lastHealthAt;
+
+  const autoEnabled = isAutoHealthEnabled(app);
+
+  // 🔸 PRIORIDADE: auto health desativado → sempre alerta amarelo,
+  // independente de endpoint ou último status.
+  if (!autoEnabled) {
+    const hasEndpoint = !!endpoint;
+
+    const baseTooltip = hasEndpoint
+      ? `A verificação automática do status da aplicação está desativada.\nUm endpoint de health está configurado (${endpoint}), mas só será usado em verificações manuais.`
+      : "A verificação automática do status da aplicação está desativada e nenhum endpoint de health está configurado.";
+
+    return {
+      title: "Monitor automático desativado",
+      tooltip: `${baseTooltip}\nAtive nas configurações avançadas do app.`,
+      iconClass: "text-amber-500",
+      dotClass: "bg-amber-400 animate-pulse",
+    };
+  }
+
+  // Sem endpoint configurado
+  if (!endpoint) {
+    return {
+      title: "Monitor de servidor desligado",
+      tooltip: "Nenhum endpoint de health configurado para este app.",
+      iconClass: "text-slate-400",
+      dotClass: "bg-slate-300",
+    };
+  }
+
+  // Endpoint mas ainda não rodou
+  if (!when) {
+    return {
+      title: "Aguardando primeira verificação",
+      tooltip: `Endpoint configurado: ${endpoint}\nAinda não há resultados de health.`,
+      iconClass: "text-slate-400",
+      dotClass: "bg-slate-300",
+    };
+  }
+
+  const safeMs = typeof ms === "number" && ms >= 0 ? ms : undefined;
+  const whenLabel = formatWhen(when) || "horário indisponível";
+
+  const statusUpper = status?.toString().toUpperCase();
+  const isUp = statusUpper === "UP" || statusUpper === "OK";
+
+  // thresholds de latência
+  let dotClass = "bg-slate-300";
+  let iconClass = "text-slate-500";
+  let statusLabel = isUp ? "Online" : "Offline/Erro";
+
+  if (!isUp) {
+    dotClass = "bg-red-500";
+    iconClass = "text-red-500";
+  } else if (safeMs !== undefined) {
+    if (safeMs <= 200) {
+      dotClass = "bg-emerald-500";
+      iconClass = "text-emerald-600";
+      statusLabel = "Online (rápido)";
+    } else if (safeMs <= 1000) {
+      dotClass = "bg-amber-400";
+      iconClass = "text-amber-500";
+      statusLabel = "Online (lento)";
+    } else {
+      dotClass = "bg-red-500";
+      iconClass = "text-red-500";
+      statusLabel = "Online (muito lento)";
+    }
+  }
+
+  const msLabel = safeMs !== undefined ? `${safeMs} ms` : "latência desconhecida";
+
+  const tooltip = `Último health: ${statusLabel}\n${msLabel}\n${whenLabel}`;
+
+  return {
+    title: statusLabel,
+    tooltip,
+    iconClass,
+    dotClass,
+  };
+}
+
 /* ---------------- component ---------------- */
 
 type Props = { app: AppDetails };
 
 export default function ConfigSection({ app }: Props) {
   const [localApp, setLocalApp] = useState(app);
+  const navigate = useNavigate();
 
   const { save, saving } = useSaveApp((localApp as any).Id ?? (localApp as any).id, {
     onSuccess: (updated) => {
@@ -124,9 +266,39 @@ export default function ConfigSection({ app }: Props) {
     [localApp, save]
   );
 
+  const appKey = (localApp as any).ref ?? (localApp as any).id;
+  const healthUi = useMemo(() => getHealthInfo(localApp as any), [localApp]);
+
   return (
     <>
-      <Card title="Configurações" icon={<Settings className="text-blue-600" size={20} />}>
+      <Card
+        title="Configurações"
+        icon={<Settings className="text-blue-600" size={20} />}
+        actions={[
+          // indicador de servidor / health
+          {
+            icon: (
+              <div className="relative inline-flex items-center justify-center">
+                <Server
+                  size={18}
+                  className={`transition-colors ${healthUi.iconClass}`}
+                />
+                <span
+                  className={`absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-white ${healthUi.dotClass}`}
+                />
+              </div>
+            ),
+            title: healthUi.tooltip,
+            onClick: () => navigate(`/apps/${appKey}/advanced-config`),
+          },
+          // botão info padrão
+          {
+            icon: <Info size={18} />,
+            title: "Configurações avançadas",
+            onClick: () => navigate(`/apps/${appKey}/advanced-config`),
+          },
+        ]}
+      >
         <ul className="divide-y divide-slate-100 text-sm">
           <Row
             label="Repositório"

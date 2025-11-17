@@ -1,9 +1,19 @@
 import SideMenu from "@/components/SideMenu";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, User2, ShieldCheck, KeyRound, ChevronRight, RefreshCw, PanelLeft, LogOut } from "lucide-react";
+import {
+  Mail,
+  User2,
+  ShieldCheck,
+  KeyRound,
+  ChevronRight,
+  RefreshCw,
+  PanelLeft,
+  LogOut,
+  Users,
+} from "lucide-react";
 import { api } from "@/lib/http";
-import { clearAuth } from "@/lib/auth";
+import { clearAuth, getUser } from "@/lib/auth";
 
 type ConfigSummary = {
   smtpConfigured?: boolean;
@@ -40,46 +50,49 @@ type SettingCardProps = Omit<SettingItem, "id">;
 export default function SettingsHome() {
   const navigate = useNavigate();
 
-  // >>> ADIÇÕES
+  // pega user direto do storage
+  const user = getUser();
+  const isSuperUser = !!user?.isSuperUser;
+
   const [menuOpen, setMenuOpen] = useState(false);
   function handleLogout() {
     clearAuth();
     navigate("/login");
   }
-  // <<<
 
   const [summary, setSummary] = useState<ConfigSummary>(initialSummary);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-  let alive = true;
+    let alive = true;
 
-  (async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // usa o client certo: api
-      const r = await api.get<ConfigSummary>("/api/config/summary");
-      if (alive) setSummary(r.data);
-    } catch (e: any) {
-      const msg =
-        e?.response?.data?.error ||
-        e?.message ||
-        "Falha ao carregar status";
-      if (alive) setError(msg);
-    } finally {
-      if (alive) setLoading(false);
-    }
-  })();
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const r = await api.get<ConfigSummary>("/api/config/summary");
+        if (alive) setSummary(r.data);
+      } catch (e: any) {
+        const msg =
+          e?.response?.data?.error ||
+          e?.message ||
+          "Falha ao carregar status";
+        if (alive) setError(msg);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
 
-  return () => {
-    alive = false;
-  };
-}, []);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
-
-  const items = useMemo(() => buildItems(summary, loading), [summary, loading]);
+  const items = useMemo(
+    () => buildItems(summary, loading, isSuperUser),
+    [summary, loading, isSuperUser],
+  );
 
   return (
     <>
@@ -126,7 +139,6 @@ export default function SettingsHome() {
               <span className="hidden sm:inline">Recarregar</span>
             </button>
 
-            {/* Logout opcional aqui também */}
             <button
               type="button"
               onClick={handleLogout}
@@ -140,7 +152,9 @@ export default function SettingsHome() {
         </header>
 
         {error ? (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 text-sm">{error}</div>
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 text-sm">
+            {error}
+          </div>
         ) : null}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
@@ -153,7 +167,11 @@ export default function SettingsHome() {
   );
 }
 
-function buildItems(summary: ConfigSummary, loading: boolean): SettingItem[] {
+function buildItems(
+  summary: ConfigSummary,
+  loading: boolean,
+  isSuperUser: boolean,
+): SettingItem[] {
   const statusFrom = (v?: boolean): SettingStatus =>
     loading || v === undefined
       ? { kind: "loading", label: "Checando…" }
@@ -161,7 +179,7 @@ function buildItems(summary: ConfigSummary, loading: boolean): SettingItem[] {
       ? { kind: "ok", label: "OK" }
       : { kind: "warn", label: "Pendente" };
 
-  return [
+  const items: SettingItem[] = [
     {
       id: "smtp",
       title: "SMTP",
@@ -203,24 +221,54 @@ function buildItems(summary: ConfigSummary, loading: boolean): SettingItem[] {
       cta: summary.apiKeySet ? "Ver chaves" : "Criar chave",
     },
   ];
+
+  // card extra só para Super Admin
+  if (isSuperUser) {
+    items.push({
+      id: "users",
+      title: "Usuários",
+      description: "Criar e gerenciar usuários do painel (Super Admin).",
+      to: "/config/users",
+      icon: Users,
+      status: { kind: "ok", label: "Restrito" },
+      accent: "from-purple-700 to-purple-500",
+      cta: "Abrir gestão",
+    });
+  }
+
+  return items;
 }
 
-function SettingCard({ title, description, to, icon: Icon, status, accent, cta }: SettingCardProps) {
+function SettingCard({
+  title,
+  description,
+  to,
+  icon: Icon,
+  status,
+  accent,
+  cta,
+}: SettingCardProps) {
   return (
     <Link
       to={to}
       className="group block rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
     >
       <div className="p-5 flex items-start gap-4">
-        <div className={`shrink-0 w-12 h-12 rounded-2xl bg-gradient-to-br ${accent} grid place-items-center`}>
+        <div
+          className={`shrink-0 w-12 h-12 rounded-2xl bg-gradient-to-br ${accent} grid place-items-center`}
+        >
           <Icon className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="text-base md:text-lg font-semibold text-slate-900 truncate">{title}</h3>
+            <h3 className="text-base md:text-lg font-semibold text-slate-900 truncate">
+              {title}
+            </h3>
             <StatusPill status={status} />
           </div>
-          <p className="mt-1 text-sm text-slate-600 line-clamp-2">{description}</p>
+          <p className="mt-1 text-sm text-slate-600 line-clamp-2">
+            {description}
+          </p>
           <div className="mt-4 flex items-center gap-1 text-sm font-medium text-blue-600 group-hover:text-blue-700">
             {cta}
             <ChevronRight className="w-4 h-4" />

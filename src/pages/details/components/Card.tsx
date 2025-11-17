@@ -7,6 +7,7 @@ type Action = {
   onClick: () => void;
   title?: string;
 };
+
 type Props = {
   title: string;
   icon?: ReactNode;
@@ -26,18 +27,25 @@ export default function Card({ title, icon, className, children, actions }: Prop
 
         {actions?.length ? (
           <div className="flex items-center gap-2">
-            {actions.map((a, i) => (
-              <button
-                key={i}
-                type="button"
-                title={a.title ?? a.label ?? "Ação"}
-                onClick={a.onClick}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100"
-              >
-                {a.icon}
-                {a.label && <span>{a.label}</span>}
-              </button>
-            ))}
+            {actions.map((a, i) => {
+              const iconOnly = !a.label;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  title={a.title ?? a.label ?? "Ação"}
+                  onClick={a.onClick}
+                  className={
+                    iconOnly
+                      ? "inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 active:bg-slate-100"
+                      : "inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100"
+                  }
+                >
+                  {a.icon}
+                  {a.label && <span>{a.label}</span>}
+                </button>
+              );
+            })}
           </div>
         ) : null}
       </header>

@@ -4,6 +4,7 @@ export type AuthUser = {
   name?: string | null;
   email: string;
   role?: "OWNER" | "ADMIN" | "MEMBER";
+  isSuperUser?: boolean; // 👈 AQUI, vindo do backend
 };
 
 type LoginResponse = {
@@ -26,7 +27,9 @@ export function saveAuth(res: LoginResponse, remember: boolean) {
 }
 
 export function loadAuth(): LoginResponse | null {
-  const raw = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY);
+  const raw =
+    localStorage.getItem(STORAGE_KEY) ??
+    sessionStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as LoginResponse;
