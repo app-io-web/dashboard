@@ -4,7 +4,7 @@ export type AuthUser = {
   name?: string | null;
   email: string;
   role?: "OWNER" | "ADMIN" | "MEMBER";
-  isSuperUser?: boolean; // 👈 AQUI, vindo do backend
+  isSuperUser?: boolean; // 👈 vindo do backend
 };
 
 type LoginResponse = {
@@ -13,6 +13,10 @@ type LoginResponse = {
 };
 
 const STORAGE_KEY = "app:auth";
+
+// chaves usadas no portal da empresa (compat com o que você já salva no login)
+const EMPRESA_TOKEN_KEY = "empresaToken";
+const EMPRESA_INFO_KEY = "empresaInfo";
 
 export function saveAuth(res: LoginResponse, remember: boolean) {
   const payload = JSON.stringify(res);
@@ -65,5 +69,29 @@ export function updateAccessToken(newToken: string) {
   } else {
     // fallback: se nada encontrado, grava em session
     sessionStorage.setItem(STORAGE_KEY, next);
+  }
+}
+
+/* =======================================================================
+ *  PORTAL DA EMPRESA – helpers simples, compat com o que você já usa
+ * =======================================================================
+ */
+
+/** Lê o token do portal da empresa (gravado no login da empresa) */
+export function getEmpresaToken(): string | null {
+  try {
+    return localStorage.getItem(EMPRESA_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Limpa sessão do portal da empresa */
+export function clearEmpresaAuth() {
+  try {
+    localStorage.removeItem(EMPRESA_TOKEN_KEY);
+    localStorage.removeItem(EMPRESA_INFO_KEY);
+  } catch {
+    // sem drama se falhar
   }
 }

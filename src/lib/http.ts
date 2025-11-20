@@ -1,7 +1,12 @@
 // src/lib/http.ts
 import axios from "axios";
 import { pushToast } from "@/lib/toast";
-import { getAccessToken, clearAuth } from "./auth"; // token + clear
+import {
+  getAccessToken,
+  clearAuth,
+  getEmpresaToken,
+  clearEmpresaAuth,
+} from "./auth";
 
 // ----------------------------------------------------
 // BASES
@@ -103,68 +108,153 @@ for (const c of [api, mailer]) {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ----------------------------------------------------
-// AUTH: helper de redirect pra login (HashRouter + GitHub Pages)
+// AUTH: redirect pra login normal
 // ----------------------------------------------------
 function redirectToLoginFrom401() {
   try {
-    const base = import.meta.env.BASE_URL || "/"; // ex: "/" em dev, "/dashboard/" no gh-pages
-
-    // Em HashRouter o path real está no hash:
-    //   http://localhost:5173/#/flows        -> "#/flows"
-    //   https://.../dashboard/#/flows       -> "#/flows"
+    const base = import.meta.env.BASE_URL || "/";
     const hash = window.location.hash || "";
     let fromPath = hash.replace(/^#/, "") || "/";
 
-    // evita loop se já estiver no login
-    if (fromPath.startsWith("/login")) {
-      fromPath = "/";
-    }
+    if (fromPath.startsWith("/login")) fromPath = "/";
 
     const target = `${base}#/login?from=${encodeURIComponent(fromPath)}`;
-
-    // se já estamos no login, não redireciona de novo
     if (!window.location.hash.startsWith("#/login")) {
       window.location.assign(target);
     }
-  } catch {
-    // deixa quieto se der algum erro bizarro de window/location
+  } catch (e) {
+    console.error("[redirectToLoginFrom401] erro:", e);
   }
 }
 
 // ----------------------------------------------------
-// AUTH: Authorization + tratamento de 401 (com eject no HMR)
+// AUTH: redirect pra login DA EMPRESA (a que tava faltando, mano!)
+// ----------------------------------------------------
+function redirectToEmpresaLoginFrom401(empresaId?: string) {
+  try {
+    const base = import.meta.env.BASE_URL || "/";
+    const hash = window.location.hash || "";
+    let fromPath = hash.replace(/^#/, "") || "/empresas";
+
+    // evita loop infinito
+    if (fromPath.startsWith("/empresa-login")) fromPath = "/empresas";
+
+    // Monta a URL do login da empresa
+    let target = `${base}#/empresa-login?from=${encodeURIComponent(fromPath)}`;
+    
+    // Se tiver o ID da empresa (útil pra pré-preencher o campo), adiciona
+    if (empresaId) {
+      target += `&empresaId=${encodeURIComponent(empresaId)}`;
+    }
+
+    if (!window.location.hash.includes("/empresa-login")) {
+      window.location.assign(target);
+    }
+  } catch (e) {
+    console.error("[redirectToEmpresaLoginFrom401] erro:", e);
+  }
+}
+
+// ----------------------------------------------------
+// AUTH: Authorization + tratamento de 401 (CORRIGIDO)
 // ----------------------------------------------------
 let authEjectors: { req?: number; res?: number } = {};
 
 export function wireAuth() {
-  // limpa interceptors antigos (HMR)
-  if (authEjectors.req != null) api.interceptors.request.eject(authEjectors.req);
-  if (authEjectors.res != null) api.interceptors.response.eject(authEjectors.res);
+  // Remove interceptors antigos (HMR)
+  if (authEjectors.req) api.interceptors.request.eject(authEjectors.req);
+  if (authEjectors.res) api.interceptors.response.eject(authEjectors.res);
 
-  // Request: adiciona Bearer automaticamente
+  // REQUEST: adiciona o token correto (prioriza token da empresa)
   authEjectors.req = api.interceptors.request.use((cfg) => {
-    const token = getAccessToken?.();
+    let token = getAccessToken();
+    const empresaToken = getEmpresaToken();
+    if (empresaToken) token = empresaToken;
+
     if (token) {
-      cfg.headers = { ...(cfg.headers || {}), Authorization: `Bearer ${token}` };
+      cfg.headers = {
+        ...cfg.headers,
+        Authorization: `Bearer ${token}`,
+      };
     }
     return cfg;
   });
 
-  // Response: 401 => limpa sessão e manda pro login certo
+  // RESPONSE: trata 401 e redireciona pro login correto
   authEjectors.res = api.interceptors.response.use(
     (r) => r,
     (err) => {
-      const status = err?.response?.status;
-      if (status === 401) {
-        try { clearAuth?.(); } catch {}
-        redirectToLoginFrom401();
+      if (err?.response?.status === 401) {
+        const tinhaEmpresaToken = !!getEmpresaToken();
+
+        if (tinhaEmpresaToken) {
+          const url = err.config?.url || "";
+          // tenta pegar o empresaId da URL quando der 401 (ex: /empresas/UUID)
+          const match = url.match(/\/empresas\/([a-f0-9-]{36})/i);
+          const empresaId = match ? match[1] : undefined;
+
+          clearEmpresaAuth();
+          redirectToEmpresaLoginFrom401(empresaId); // ← agora a função EXISTE e ainda passa o ID!
+        } else {
+          clearAuth();
+          redirectToLoginFrom401();
+        }
       }
       return Promise.reject(err);
     }
   );
 }
-wireAuth();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ----------------------------------------------------
 // AUTH: também para o mailer (SMTP config é protegido)

@@ -480,9 +480,17 @@ function Row({
   const isEmpty = shown.length === 0;
 
   return (
-    <li className="grid [grid-template-columns:160px_minmax(0,1fr)_140px] items-start gap-4 py-3">
-      <div className="pt-2 text-slate-500">{label}</div>
+    <li
+      className="
+        flex flex-col gap-2 py-3
+        sm:grid sm:items-start sm:gap-4
+        sm:[grid-template-columns:160px_minmax(0,1fr)_140px]
+      "
+    >
+      {/* LABEL */}
+      <div className="text-slate-500 sm:pt-2">{label}</div>
 
+      {/* VALOR */}
       <div className="min-w-0 flex-1 overflow-hidden">
         {multiline ? (
           <p className="whitespace-pre-wrap break-words leading-relaxed text-slate-900 max-h-40 overflow-auto pr-1">
@@ -498,17 +506,24 @@ function Row({
         )}
       </div>
 
-      <div className="flex justify-end shrink-0">
+      {/* BOTÃO */}
+      <div className="flex sm:justify-end w-full sm:w-auto shrink-0">
         <button
           onClick={onEdit}
           disabled={disabled}
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 enabled:hover:bg-slate-50 transition disabled:opacity-50"
-          title={isEmpty ? "Adicionar" : "Editar"}
+          className="
+            inline-flex h-9 items-center gap-2 rounded-md border border-slate-200
+            bg-white px-3 text-sm font-medium text-slate-700
+            enabled:hover:bg-slate-50 transition disabled:opacity-50
+            w-full sm:w-auto
+          "
+          title={isEmpty ? 'Adicionar' : 'Editar'}
         >
           <Pencil size={16} />
-          {isEmpty ? "Adicionar" : "Editar"}
+          {isEmpty ? 'Adicionar' : 'Editar'}
         </button>
       </div>
     </li>
+
   );
 }

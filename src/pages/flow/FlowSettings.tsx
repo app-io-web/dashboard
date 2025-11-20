@@ -181,56 +181,64 @@ export default function FlowSettings() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
-      <div className="bg-white border-b border-gray-300 px-6 py-4 flex justify-between items-center">
-        {/* ESQUERDA: título + status do app vinculado exibido DIRETO */}
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-gray-900">
-            ← Voltar
-          </button>
+      {/* HEADER */}
+      <div className="bg-white border-b border-gray-300 px-4 py-3 md:px-6 md:py-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-800">Configurações do Fluxo</h1>
-            {selectedApp ? (
-              <div className="text-sm text-gray-600 flex flex-wrap items-center gap-2">
-                <span className="text-gray-400">•</span>{" "}
-                <span className="text-gray-500">App:</span>{" "}
-                <a
-                  href={`/apps/${selectedApp.id}?empresaId=${empresaId}`}
-                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition text-xs font-medium"
-                  title={`Ir para o app ${selectedApp.nome}`}
-                >
-                  <span>{selectedApp.nome}</span>
-                  {selectedApp.empresaNome && (
-                    <span className="text-[10px] text-gray-500">{selectedApp.empresaNome}</span>
-                  )}
-                </a>
-                <span className="text-gray-400">•</span>{" "}
-                <span className="text-emerald-700 font-medium">
-                  vinculado a este fluxo
-                </span>
-                {otherFlowCount(selectedApp) > 0 && (
-                  <>
-                    <span className="text-gray-400">•</span>{" "}
+          {/* ESQUERDA */}
+          <div className="flex items-start gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="text-gray-600 hover:text-gray-900 text-sm md:text-base"
+            >
+              ← Voltar
+            </button>
+
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-2xl font-bold text-gray-800 leading-snug">
+                Configurações do Fluxo
+              </h1>
+
+              {selectedApp ? (
+                <div className="text-xs md:text-sm text-gray-600 mt-1 flex flex-col md:flex-row flex-wrap md:items-center gap-1 md:gap-2">
+
+                  <span className="text-gray-500">App:</span>
+
+                  <a
+                    href={`/apps/${selectedApp.id}?empresaId=${empresaId}`}
+                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition text-xs font-medium w-fit"
+                  >
+                    <span>{selectedApp.nome}</span>
+                    {selectedApp.empresaNome && (
+                      <span className="text-[10px] text-gray-500">{selectedApp.empresaNome}</span>
+                    )}
+                  </a>
+
+                  <span className="text-emerald-700 font-medium">vinculado a este fluxo</span>
+
+                  {otherFlowCount(selectedApp) > 0 && (
                     <span className="text-amber-600 font-medium">
                       também usado em {otherFlowCount(selectedApp)} outro(s) fluxo(s)
                     </span>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="text-sm text-gray-400">Sem app vinculado</div>
-            )}
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 mt-1">Sem app vinculado</div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <button
-          onClick={onSave}
-          disabled={isSaving || disabled}
-          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition"
-        >
-          {isSaving ? "Salvando..." : "Salvar"}
-        </button>
+          {/* DIREITA */}
+          <button
+            onClick={onSave}
+            disabled={isSaving || disabled}
+            className="w-full md:w-auto bg-green-600 text-white px-4 py-2 md:px-6 rounded-lg hover:bg-green-700 disabled:opacity-50 transition font-medium text-sm md:text-base"
+          >
+            {isSaving ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
       </div>
+
 
       {/* CONTEÚDO */}
       <div className="flex-1 p-8">

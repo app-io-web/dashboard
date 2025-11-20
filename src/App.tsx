@@ -18,6 +18,9 @@ import FlowEditor from "@/pages/flow/FlowEditor";
 import FlowSettings from "@/pages/flow/FlowSettings";
 import AdvancedConfigPage from "@/pages/details/AdvancedConfigPage";
 import UsersAdminPage from "@/pages/config/users/UsersAdminPage"; // 👈 NOVO
+import EmpresaLoginPage from "@/pages/auth/EmpresaLoginPage"; // 👈 ADICIONE
+import EmpresaHomePage from "@/pages/empresa/EmpresaHomePage"; // 👈 portal da empresa
+
 
 
 export default function App() {
@@ -187,7 +190,6 @@ export default function App() {
             </RequireAuth>
           }
         />
-                {/* 👇 NOVO: página de usuários (conteúdo já faz check de superuser) */}
         <Route
           path="/config/users"
           element={
@@ -196,6 +198,31 @@ export default function App() {
             </RequireAuth>
           }
         />
+        <Route
+          path="/empresa-login"
+          element={
+            <PublicOnly>
+              <EmpresaLoginPage />
+            </PublicOnly>
+          }
+        />
+        
+        {/* LOGIN DA EMPRESA (portal separado) */}
+        <Route
+          path="/empresa-login"
+          element={
+            <PublicOnly>
+              <EmpresaLoginPage />
+            </PublicOnly>
+          }
+        />
+
+        {/* PORTAL DA EMPRESA (usa token empresaToken, não o RequireAuth padrão) */}
+        <Route
+          path="/empresa-portal/:id"
+          element={<EmpresaHomePage />}
+        />
+
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
